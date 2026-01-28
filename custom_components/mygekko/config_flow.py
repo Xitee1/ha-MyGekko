@@ -5,6 +5,7 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from aiohttp import ClientConnectorError
 from homeassistant import config_entries
+from homeassistant.config_entries import OptionsFlowWithReload
 from homeassistant.const import CONF_API_KEY
 from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.const import CONF_PASSWORD
@@ -201,8 +202,8 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         return False
 
 
-class MyGekkoOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle MyGekko options."""
+class MyGekkoOptionsFlowHandler(OptionsFlowWithReload):
+    """Handle MyGekko options. Extends OptionsFlowWithReload for automatic reload."""
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
