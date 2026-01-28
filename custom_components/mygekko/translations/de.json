@@ -1,4 +1,21 @@
 {
+  "options": {
+    "step": {
+      "init": {
+        "title": "MyGekko Optionen",
+        "data": {
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
+        },
+        "data_description": {
+          "scan_interval": "Wie oft die MyGekko API abgefragt wird (5-300 Sekunden)"
+        }
+      }
+    },
+    "error": {
+      "scan_interval_too_small": "Das Aktualisierungsintervall muss mindestens 5 Sekunden betragen",
+      "scan_interval_too_large": "Das Aktualisierungsintervall darf maximal 300 Sekunden betragen"
+    }
+  },
   "config": {
     "step": {
       "connection_selection": {

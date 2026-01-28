@@ -22,7 +22,11 @@ from .const import CONF_CONNECTION_MY_GEKKO_CLOUD
 from .const import CONF_CONNECTION_MY_GEKKO_CLOUD_LABEL
 from .const import CONF_CONNECTION_TYPE
 from .const import CONF_GEKKOID
+from .const import CONF_SCAN_INTERVAL
+from .const import DEFAULT_SCAN_INTERVAL
 from .const import DOMAIN
+from .const import MAX_SCAN_INTERVAL
+from .const import MIN_SCAN_INTERVAL
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -62,6 +66,14 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 3
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
+
+    @staticmethod
+    @config_entries.callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Get the options flow for this handler."""
+        return MyGekkoOptionsFlowHandler()
 
     def __init__(self):
         """Initialize."""
@@ -187,3 +199,36 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("MyGekkoError")
 
         return False
+
+
+class MyGekkoOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle MyGekko options."""
+
+    async def async_step_init(self, user_input=None):
+        """Manage the options."""
+        errors = {}
+
+        if user_input is not None:
+            scan_interval = user_input.get(CONF_SCAN_INTERVAL)
+            if scan_interval < MIN_SCAN_INTERVAL:
+                errors[CONF_SCAN_INTERVAL] = "scan_interval_too_small"
+            elif scan_interval > MAX_SCAN_INTERVAL:
+                errors[CONF_SCAN_INTERVAL] = "scan_interval_too_large"
+            else:
+                return self.async_create_entry(title="", data=user_input)
+
+        current_interval = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SCAN_INTERVAL, default=current_interval
+                    ): vol.Coerce(int),
+                }
+            ),
+            errors=errors,
+        )
