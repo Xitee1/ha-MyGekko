@@ -108,7 +108,7 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="connection_selection",
-            data_schema=self._with_current_values(CONNECTION_SCHEMA),
+            data_schema=self._with_current_values(CONNECTION_SCHEMA, user_input),
             errors=self._errors,
             last_step=False,
         )
@@ -143,7 +143,7 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="connection_mygekko_cloud",
-            data_schema=self._with_current_values(CLOUD_CONNECTION_SCHEMA),
+            data_schema=self._with_current_values(CLOUD_CONNECTION_SCHEMA, user_input),
             errors=self._errors,
         )
 
@@ -177,7 +177,7 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="connection_local",
-            data_schema=self._with_current_values(LOCAL_CONNECTION_SCHEMA),
+            data_schema=self._with_current_values(LOCAL_CONNECTION_SCHEMA, user_input),
             errors=self._errors,
         )
 
@@ -186,13 +186,18 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Return whether an existing entry is being reconfigured."""
         return self.source == config_entries.SOURCE_RECONFIGURE
 
-    def _with_current_values(self, schema):
-        """Prefill a form with the data of the entry that is being reconfigured."""
+    def _with_current_values(self, schema, user_input=None):
+        """Prefill a form with the data of the entry that is being reconfigured.
+
+        What the user just submitted takes precedence over what is stored, so a
+        form redisplayed after a validation error keeps their input instead of
+        resetting it to the values they are trying to replace.
+        """
         if not self._is_reconfigure:
             return schema
 
         return self.add_suggested_values_to_schema(
-            schema, self._get_reconfigure_entry().data
+            schema, {**self._get_reconfigure_entry().data, **(user_input or {})}
         )
 
     def _async_update_entry(self, data):
@@ -238,8 +243,10 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             globals_network = client.get_globals_network()
             if globals_network:
                 return globals_network.get("gekkoname")
-        except ClientConnectorError:
-            _LOGGER.exception("ClientConnectorError")
-        except MyGekkoError:
-            _LOGGER.exception("MyGekkoError")
+        except Exception:  # noqa: BLE001
+            # The name is only used as the entry title and has a fallback, so no
+            # failure here may abort a flow whose credentials already validated.
+            # get_globals_network() indexes the payload without guarding, which
+            # raises KeyError on an unexpected response.
+            _LOGGER.debug("Could not determine the gekko name", exc_info=True)
         return None
