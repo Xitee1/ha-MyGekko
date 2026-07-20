@@ -78,6 +78,13 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_connection_selection(user_input)
 
+    async def async_step_reconfigure(self, user_input=None):
+        """Handle a flow initialized by reconfiguring an existing entry."""
+        self._errors = {}
+        _LOGGER.debug("Config flow async_step_reconfigure %s", user_input)
+
+        return await self.async_step_connection_selection(user_input)
+
     async def async_step_connection_selection(self, user_input):
         """Show the configuration form to edit location data."""
         _LOGGER.debug("Config flow async_step_connection_selection %s", user_input)
@@ -92,13 +99,16 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_connection_local(user_input)
 
             if connection_type == CONF_CONNECTION_DEMO_MODE:
+                if self._is_reconfigure:
+                    return self._async_update_entry(user_input)
+
                 return self.async_create_entry(
                     title=CONF_CONNECTION_DEMO_MODE_LABEL, data=user_input
                 )
 
         return self.async_show_form(
             step_id="connection_selection",
-            data_schema=CONNECTION_SCHEMA,
+            data_schema=self._with_current_values(CONNECTION_SCHEMA),
             errors=self._errors,
             last_step=False,
         )
@@ -120,6 +130,9 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 if client is not None:
                     user_input[CONF_CONNECTION_TYPE] = CONF_CONNECTION_MY_GEKKO_CLOUD
+                    if self._is_reconfigure:
+                        return self._async_update_entry(user_input)
+
                     gekko_name = await self._read_gekko_name(client)
                     return self.async_create_entry(
                         title=gekko_name or user_input[CONF_GEKKOID],
@@ -130,7 +143,7 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="connection_mygekko_cloud",
-            data_schema=CLOUD_CONNECTION_SCHEMA,
+            data_schema=self._with_current_values(CLOUD_CONNECTION_SCHEMA),
             errors=self._errors,
         )
 
@@ -151,6 +164,9 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 if client is not None:
                     user_input[CONF_CONNECTION_TYPE] = CONF_CONNECTION_LOCAL
+                    if self._is_reconfigure:
+                        return self._async_update_entry(user_input)
+
                     gekko_name = await self._read_gekko_name(client)
                     return self.async_create_entry(
                         title=gekko_name or user_input[CONF_IP_ADDRESS],
@@ -161,8 +177,31 @@ class MyGekkoFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="connection_local",
-            data_schema=LOCAL_CONNECTION_SCHEMA,
+            data_schema=self._with_current_values(LOCAL_CONNECTION_SCHEMA),
             errors=self._errors,
+        )
+
+    @property
+    def _is_reconfigure(self):
+        """Return whether an existing entry is being reconfigured."""
+        return self.source == config_entries.SOURCE_RECONFIGURE
+
+    def _with_current_values(self, schema):
+        """Prefill a form with the data of the entry that is being reconfigured."""
+        if not self._is_reconfigure:
+            return schema
+
+        return self.add_suggested_values_to_schema(
+            schema, self._get_reconfigure_entry().data
+        )
+
+    def _async_update_entry(self, data):
+        """Update the entry that is being reconfigured and finish the flow."""
+        # Replace the data instead of merging it, so switching the connection
+        # type does not leave the credentials of the previous one behind. The
+        # title is left untouched, the user may have renamed the entry.
+        return self.async_update_reload_and_abort(
+            self._get_reconfigure_entry(), data=data
         )
 
     async def _test_credentials_cloud_mygekko(self, username, apikey, gekkoid):
