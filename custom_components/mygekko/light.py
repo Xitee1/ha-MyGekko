@@ -86,7 +86,10 @@ class MyGekkoLight(MyGekkoEntity, LightEntity):
             self._set_optimistic("brightness", brightness, self._light.brightness)
         else:
             await self._light.set_state(LightState.ON)
-        self._set_optimistic("state", LightState.ON, self._light.state)
+            # Only claimed for a real state command: writing a color or a
+            # brightness does not switch the myGekko light on, so reporting it
+            # as on would be a lie that outlives the next poll.
+            self._set_optimistic("state", LightState.ON, self._light.state)
         await self.coordinator.async_request_refresh()
 
     @property
